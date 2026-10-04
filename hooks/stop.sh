@@ -10,7 +10,7 @@ active=$(jq -r '.stop_hook_active // false' <<<"$in")
 transcript=$(jq -r '.transcript_path // empty' <<<"$in")
 bg=$(jq -r '((.background_tasks // []) | length)' <<<"$in")
 state=$(cat "$D/state" 2>/dev/null || echo idle)
-thr=${CTX_RELAY_THRESHOLD:-50}
+thr=$(ctx_cfg THRESHOLD 50)
 
 block() { jq -cn --arg r "$1" '{decision:"block",reason:$r}'; exit 0; }
 
@@ -30,13 +30,13 @@ case "$state" in
       rm -f "$D/rotate.now"
       block "$(ctx_request_handoff "$D")"
     fi
-    [[ "${CTX_RELAY_AUTOCLEAR:-1}" == 1 ]] || exit 0
+    [[ "$(ctx_cfg AUTOCLEAR 1)" == 1 ]] || exit 0
     pct=$(ctx_usage_pct "$D" "$transcript")
     # Relaunched session: the first Stop is the reply to the handoff-reading prompt. It only records
     # the fresh-context baseline; later rotations need real growth, or a high baseline loops forever.
     if (( ${CTX_RELAY_ROTATIONS:-0} > 0 )); then
       if [[ ! -s "$D/baseline" ]]; then echo "$pct" > "$D/baseline"; exit 0; fi
-      (( pct - $(cat "$D/baseline") >= ${CTX_RELAY_MIN_GROWTH:-15} )) || exit 0
+      (( pct - $(cat "$D/baseline") >= $(ctx_cfg MIN_GROWTH 15) )) || exit 0
     fi
     (( pct >= thr )) || exit 0
     plan=$(ctx_plan_handoff "$CTX_RELAY_HANDOFF_DIR")

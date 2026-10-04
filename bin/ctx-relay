@@ -7,10 +7,49 @@ if [[ "${1:-}" == now ]]; then   # ctx-relay now: rotate the current run at its 
   [[ -d "$d" ]] || { echo "ctx-relay: no run found" >&2; exit 1; }
   touch "$d/rotate.now"; echo "ctx-relay: rotation queued for $d (fires at the next pause)"; exit 0
 fi
+BASE_DIR=${CTX_RELAY_HOME:-$HOME/.claude/ctx-relay}
+if [[ "${1:-}" == config ]]; then   # ctx-relay config [threshold=N] [growth=N] [emergency=N] [autoclear=on|off] [--save]
+  shift; d=${CTX_RELAY_RUN_DIR:-$(ls -dt "$BASE_DIR"/runs/*/ 2>/dev/null | head -1)}
+  [[ -d "$d" ]] || { echo "ctx-relay: no run found" >&2; exit 1; }
+  save=0; upd=()
+  for a in "$@"; do
+    case "$a" in
+      --save) save=1 ;;
+      threshold=*|growth=*|emergency=*|autoclear=*)
+        k=${a%%=*}; v=${a#*=}
+        case "$k" in
+          threshold) K=THRESHOLD ;; growth) K=MIN_GROWTH ;; emergency) K=EMERGENCY ;; autoclear) K=AUTOCLEAR ;;
+        esac
+        if [[ "$k" == autoclear ]]; then
+          case "$v" in on|1) v=1 ;; off|0) v=0 ;; *) echo "ctx-relay: autoclear must be on|off" >&2; exit 2 ;; esac
+        else
+          [[ "$v" =~ ^[0-9]+$ ]] && (( v >= 1 && v <= 100 )) || { echo "ctx-relay: $k must be 1-100 (percent)" >&2; exit 2; }
+        fi
+        upd+=("$K=$v") ;;
+      *) echo "ctx-relay: unknown setting '$a' (threshold|growth|emergency|autoclear|--save)" >&2; exit 2 ;;
+    esac
+  done
+  touch "$d/config"
+  for u in "${upd[@]+"${upd[@]}"}"; do
+    sed -i.bak "/^${u%%=*}=/d" "$d/config" && rm -f "$d/config.bak"; echo "$u" >> "$d/config"
+  done
+  if (( save )); then mkdir -p "$BASE_DIR"; cp "$d/config" "$BASE_DIR/config"; fi
+  . "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/lib/ctx-lib.sh"
+  CTX_RELAY_RUN_DIR=$d
+  printf 'ctx-relay settings (this run%s):\n  threshold  %s%%  (first pause above this asks for a handoff)\n  growth     %s pts  (min growth over a fresh session baseline before rotating again)\n  emergency  %s%%  (interrupt mid-run)\n  autoclear  %s\n' \
+    "$( ((save)) && echo ', saved as default')" "$(ctx_cfg THRESHOLD 50)" "$(ctx_cfg MIN_GROWTH 15)" "$(ctx_cfg EMERGENCY 90)" \
+    "$([[ $(ctx_cfg AUTOCLEAR 1) == 1 ]] && echo on || echo off)"
+  exit 0
+fi
+if [[ "${1:-}" == install ]]; then   # ctx-relay install: add the /relay slash command to ~/.claude/commands
+  me=$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")
+  mkdir -p "$HOME/.claude/commands"
+  sed "s|@CTX_RELAY_BIN@|$me|g" "$(dirname "$me")/../commands/relay.md" > "$HOME/.claude/commands/relay.md"
+  echo "ctx-relay: installed /relay -> $HOME/.claude/commands/relay.md"; exit 0
+fi
 SELF=$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")
 ROOT=$(cd "$(dirname "$SELF")/.." && pwd)
 CLAUDE=${CTX_RELAY_CLAUDE:-claude}
-BASE_DIR=${CTX_RELAY_HOME:-$HOME/.claude/ctx-relay}
 
 export CTX_RELAY_RUN_ID="$(date +%Y%m%d-%H%M%S)-$$"
 export CTX_RELAY_RUN_DIR="$BASE_DIR/runs/$CTX_RELAY_RUN_ID"
@@ -19,6 +58,7 @@ export CTX_RELAY_HANDOFF_DIR=${CTX_RELAY_HANDOFF_DIR:-$PWD}
 export CTX_RELAY_THRESHOLD=${CTX_RELAY_THRESHOLD:-50}
 export CTX_RELAY_AUTOCLEAR=${CTX_RELAY_AUTOCLEAR:-1}
 mkdir -p "$CTX_RELAY_RUN_DIR"
+[[ -f "$BASE_DIR/config" ]] && cp "$BASE_DIR/config" "$CTX_RELAY_RUN_DIR/config"   # saved defaults
 
 # The user's own statusline is chained, not replaced.
 export CTX_RELAY_ORIG_STATUSLINE=$(jq -r '.statusLine.command // empty' "$HOME/.claude/settings.json" 2>/dev/null)

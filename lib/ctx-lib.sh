@@ -2,6 +2,14 @@
 
 CTX_RELAY_MAX_DEPTH=5
 
+# Setting KEY (THRESHOLD, MIN_GROWTH, EMERGENCY, AUTOCLEAR): run config > env CTX_RELAY_KEY > default.
+# The run config is written by `ctx-relay config` (the /relay slash command) and survives rotations.
+ctx_cfg() {  # KEY DEFAULT
+  local v ev="CTX_RELAY_$1"
+  [[ -n "${CTX_RELAY_RUN_DIR:-}" ]] && v=$(sed -n "s/^$1=//p" "$CTX_RELAY_RUN_DIR/config" 2>/dev/null | tail -n 1)
+  echo "${v:-${!ev:-$2}}"
+}
+
 # Context usage (integer percent). Prefer the statusline snapshot, else the transcript.
 ctx_usage_pct() {
   local dir="$1" transcript="${2:-}" pct size used

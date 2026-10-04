@@ -54,6 +54,15 @@ run nf FAKE_SCENARIO=nowfile
 [[ $(launches) == 2 ]] && ok "'ctx-relay now' trigger file rotates at next Stop" || bad "launches=$(launches)"
 run noauto FAKE_PCT=60 CTX_RELAY_AUTOCLEAR=0 FAKE_WAIT=0
 [[ $(launches) == 1 ]] && ok "AUTOCLEAR=0: no automatic rotation" || bad "launches=$(launches)"
+echo "config (/relay)"
+mkdir -p "$T/cfg/home"; echo THRESHOLD=70 > "$T/cfg/home/config"
+run cfg FAKE_PCT=60 FAKE_WAIT=0 CTX_RELAY_HOME="$T/cfg/home"
+[[ $(launches) == 1 ]] && ok "saved config threshold=70 beats env 50 (60% -> no rotation)" || bad "launches=$(launches)"
+R="$T/cfgrun"; mkdir -p "$R"
+out=$(CTX_RELAY_RUN_DIR="$R" CTX_RELAY_HOME="$T/cfg/home" "$ROOT/bin/ctx-relay" config threshold=40 growth=10 autoclear=off --save)
+grep -q '^THRESHOLD=40' "$R/config" && grep -q '^MIN_GROWTH=10' "$R/config" && grep -q '^AUTOCLEAR=0' "$R/config" && grep -q 'threshold  40%' <<<"$out" && ok "config sets values" || bad "config: $out"
+grep -q '^THRESHOLD=40' "$T/cfg/home/config" && ok "--save writes defaults" || bad "save"
+CTX_RELAY_RUN_DIR="$R" "$ROOT/bin/ctx-relay" config threshold=abc >/dev/null 2>&1 && bad "bad value accepted" || ok "rejects bad value"
 echo "chain depth"
 mkdir -p "$T/chain"; W="$T/chain"
 printf 'Base: none\nChain depth: 1\n' > "$W/HANDOFF-2026-01-01-0000.md"

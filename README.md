@@ -84,6 +84,20 @@ escaping. (Detecting a trailing prompt is best-effort.)
 Units: `CTX_RELAY_THRESHOLD` (default 50) is percent of the context window; `CTX_RELAY_MIN_GROWTH`
 (default 15) is percentage points of growth over the fresh session's baseline.
 
+## Settings: `/relay` slash command
+
+Run `bin/ctx-relay install` once; it adds `/relay` to `~/.claude/commands`. Then, inside a session:
+
+    /relay                                 show current settings
+    /relay threshold=40 growth=10          change them for this run (survives rotations)
+    /relay emergency=85 autoclear=off
+    /relay threshold=40 --save             also make these the defaults for future launches
+    /relay now                             same as `ctx-relay now`
+
+Precedence: `/relay` setting, then `CTX_RELAY_*` environment variable, then built-in default. Saved
+defaults live in `~/.claude/ctx-relay/config`. The command only works in sessions started through
+`ctx-relay`.
+
 ## Manual rotation
 
 - Type `relay now` (or `relay`) in the session: the agent writes the handoff in that turn, then the
