@@ -8,7 +8,16 @@ n=$(( $(cat "$FAKE_LOG.count" 2>/dev/null || echo 0) + 1 )); echo $n > "$FAKE_LO
 echo "launch $n: $*" >> "$FAKE_LOG"
 hook() { jq -r ".hooks.$1[0].hooks[0].command" "$settings"; }
 sl=$(jq -r .statusLine.command "$settings")
-(( n > 1 )) && exit 0                      # relaunched session: user quits (Ctrl-D)
+if (( n > 1 )); then                       # relaunched session
+  if [[ -n "${FAKE_RELAUNCH_PCTS:-}" ]]; then   # e.g. "60 70 80": usage at each successive Stop
+    for pc in $FAKE_RELAUNCH_PCTS; do
+      echo "{\"context_window\":{\"used_percentage\":$pc,\"context_window_size\":200000}}" | bash -c "$sl" >/dev/null
+      o=$(jq -cn '{hook_event_name:"Stop",stop_hook_active:false,transcript_path:"/nonexistent",background_tasks:[]}' | bash -c "$(hook Stop)")
+      echo "relaunch-stop@$pc: ${o:-none}" >> "$FAKE_LOG"
+    done
+  fi
+  exit 0                                    # user quits (Ctrl-D)
+fi
 case "${FAKE_SCENARIO:-rotate}" in
   quit)   exit 0 ;;
   die143) exit 143 ;;                        # killed, but no rotation flag
