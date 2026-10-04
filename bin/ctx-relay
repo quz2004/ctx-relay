@@ -88,8 +88,17 @@ relaunch_args() {
   printf '%s\0' "${out[@]}"
 }
 
-args=("$@")
 rotations=0
+if [[ "${1:-}" == next ]]; then   # ctx-relay next [claude flags]: start fresh from the newest handoff
+  shift
+  . "$ROOT/lib/ctx-lib.sh"
+  h=$(ctx_latest_handoff "$CTX_RELAY_HANDOFF_DIR")
+  [[ -n "$h" ]] || { echo "ctx-relay: no HANDOFF-*.md in $CTX_RELAY_HANDOFF_DIR" >&2; exit 1; }
+  echo "[ctx-relay] continuing from $h" >&2
+  set -- "$@" "Read $CTX_RELAY_HANDOFF_DIR/$h, then every handoff listed under its Base: chain (oldest context first). Continue from the Next Step. Do not re-explore."
+  rotations=1   # starts with the handoff already in context: treat like a relaunch (baseline + min growth)
+fi
+args=("$@")
 while :; do
   export CTX_RELAY_ROTATIONS=$rotations
   rm -f "$CTX_RELAY_RUN_DIR"/{rotate.flag,ctx.json,baseline}; echo idle > "$CTX_RELAY_RUN_DIR/state"

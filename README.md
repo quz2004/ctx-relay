@@ -73,6 +73,7 @@ more than 5 files, and keeps references from rotting.
 ## Usage
 
     bin/ctx-relay [claude flags...]        # drop-in for `claude`
+    bin/ctx-relay next [claude flags...]   # start fresh, reading the newest handoff in this directory
     test/run-tests.sh                      # no real claude, no tmux; safe anywhere
 
 Handoffs are written to the launch directory (`CTX_RELAY_HANDOFF_DIR`); gitignore `HANDOFF-*.md`
