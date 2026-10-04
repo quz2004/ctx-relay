@@ -107,6 +107,14 @@ defaults live in `~/.claude/ctx-relay/config`. The command only works in session
 - Notify-only: with `CTX_RELAY_AUTOCLEAR=0` (or `/relay autoclear=off`), the first pause above the
   threshold shows one message, "context at N%... type 'relay now'", and never rotates by itself.
 
+## Antigravity CLI (`agy`)
+
+    bin/ctx-relay-agy [agy flags...]       # drop-in for `agy`; same rotation, handoff files and `next`
+    bin/ctx-relay-agy now                  # queue a rotation (also: type `relay now` in the session)
+    test/run-tests-agy.sh                  # fake agy; never touches ~/.agents
+
+Details, measured facts and caveats: `docs/agy-integration.md`. `agy-plus` wiring: `dist/agy-plus`.
+
 ## Requirements and limitations
 
 - bash, `jq`, and Claude Code on macOS or Linux. **Windows is not supported** (bash, signals, `ps`).

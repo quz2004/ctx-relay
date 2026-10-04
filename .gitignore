@@ -1,2 +1,4 @@
 HANDOFF-*.md
 dist/claude-pro
+.claude/
+dist/agy-plus

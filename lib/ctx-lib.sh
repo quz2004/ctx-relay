@@ -13,6 +13,12 @@ ctx_cfg() {  # KEY DEFAULT
 # Context usage (integer percent). Prefer the statusline snapshot, else the transcript.
 ctx_usage_pct() {
   local dir="$1" transcript="${2:-}" pct size used
+  if [[ "${CTX_RELAY_BACKEND:-claude}" == agy ]]; then   # agy: no statusline snapshot; read its transcript
+    [[ -f "$transcript" ]] || { echo 0; return; }
+    # Each model step records input_tokens (uncached) + cache_read_tokens; their sum is the prompt size.
+    used=$(tail -n 400 "$transcript" | jq -R 'fromjson? | select(.input_tokens != null) | .input_tokens + (.cache_read_tokens // 0)' 2>/dev/null | tail -n 1)
+    echo $(( ${used:-0} * 100 / ${CTX_RELAY_WINDOW:-1000000} )); return
+  fi
   if [[ -s "$dir/ctx.json" ]]; then
     pct=$(jq -r '.used_percentage // empty' "$dir/ctx.json" 2>/dev/null)
     [[ -n "$pct" ]] && { printf '%.0f' "$pct"; return; }
@@ -82,4 +88,31 @@ ctx_request_handoff() {  # run_dir
   printf '%s\n' "$name|$base|$depth|$extra" > "$D/request"
   echo 0 > "$D/attempts"; echo requested > "$D/state"
   ctx_block_reason "$name" "$base" "$depth" "$extra"
+}
+
+# Register (install) or remove (uninstall) ctx-relay in a workspace's .agents/hooks.json, keeping other entries.
+# Workspace, not global: agy 1.2.x loads only one named hook from ~/.agents/hooks.json, so a second entry there never runs.
+# The hooks are inert unless the session was started through ctx-relay-agy (they check CTX_RELAY_RUN_DIR).
+ctx_agy_hooks_json() {  # install|uninstall ROOT [DIR]
+  local mode="$1" root="$2" f="${CTX_RELAY_AGY_HOOKS_JSON:-${3:-$PWD}/.agents/hooks.json}" cur tmp
+  cur='{}'; [[ -s "$f" ]] && cur=$(cat "$f")
+  jq -e 'type == "object"' <<<"$cur" >/dev/null 2>&1 || { echo "ctx-relay: $f is not a JSON object; not touching it" >&2; return 1; }
+  if [[ "$mode" == install ]]; then
+    tmp=$(jq --arg h "$root/hooks/agy-hook.sh" '. + {"ctx-relay": {
+        PreInvocation: [{type: "command", command: ($h + " PreInvocation"), timeout: 15}],
+        Stop:          [{type: "command", command: ($h + " Stop"),          timeout: 15}]}}' <<<"$cur") || return 1
+  else
+    tmp=$(jq 'del(.["ctx-relay"])' <<<"$cur") || return 1
+  fi
+  mkdir -p "$(dirname "$f")"
+  [[ -s "$f" && ! -e "$f.bak-ctx-relay" ]] && cp "$f" "$f.bak-ctx-relay"
+  printf '%s\n' "$tmp" > "$f"
+  echo "ctx-relay: ${mode}ed agy hooks -> $f"
+}
+# Make sure the launch workspace has the hooks (a no-op when present). CTX_RELAY_AUTOINSTALL=0 opts out.
+ctx_agy_ensure_hooks() {  # ROOT
+  local f="${CTX_RELAY_AGY_HOOKS_JSON:-$PWD/.agents/hooks.json}"
+  [[ "${CTX_RELAY_AUTOINSTALL:-1}" == 0 ]] && return 0
+  jq -e --arg h "$1/hooks/agy-hook.sh Stop" '."ctx-relay".Stop[0].command == $h' "$f" >/dev/null 2>&1 && return 0
+  ctx_agy_hooks_json install "$1" >&2
 }

@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# ctx-relay for Antigravity CLI: drop-in for `agy`. Same launcher as bin/ctx-relay, agy backend.
+export CTX_RELAY_BACKEND=agy
+self=$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")
+exec "$(dirname "$self")/ctx-relay" "$@"

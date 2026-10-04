@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# Stand-in for `agy`. Drives the real adapter (hooks/agy-hook.sh) with agy-shaped payloads and a
+# transcript in agy's format. Like agy, it exits 0 when SIGTERM'd.
+# FAKE_PCT: usage as percent of CTX_RELAY_WINDOW. FAKE_SCENARIO: rotate (default) | quit | stale | manual | emergency | nowfile
+set -u
+HOOK="$(cd "$(dirname "$0")/.." && pwd)/hooks/agy-hook.sh"
+n=$(( $(cat "$FAKE_LOG.count" 2>/dev/null || echo 0) + 1 )); echo $n > "$FAKE_LOG.count"
+echo "launch $n: $*" >> "$FAKE_LOG"
+tr="$FAKE_LOG.transcript"
+sp=""; trap '[[ -n "$sp" ]] && kill "$sp" 2>/dev/null; exit 0' TERM
+
+# settx PCT [USER_TEXT]: transcript whose last model step used PCT% of the window
+settx() {
+  { [[ -n "${2:-}" ]] && jq -cn --arg c "$(printf '<USER_REQUEST>\n%s\n</USER_REQUEST>\n<ADDITIONAL_METADATA>x</ADDITIONAL_METADATA>' "$2")" '{type:"USER_INPUT",content:$c}'
+    jq -cn --argjson t $(( $1 * 1000 )) '{type:"PLANNER_RESPONSE",input_tokens:($t-1000),cache_read_tokens:1000,output_tokens:5}'
+  } > "$tr"
+}
+payload() { jq -cn --arg t "$tr" --argjson idle "${1:-true}" '{conversationId:"c",transcriptPath:$t,workspacePaths:["/w"],modelName:"m",fullyIdle:$idle,terminationReason:"NO_TOOL_CALL",error:""}'; }
+stop() { payload "${1:-true}" | "$HOOK" Stop; }
+pre()  { payload | "$HOOK" PreInvocation; }
+# obey: write the handoff file the instruction names, with the header it asks for
+obey() {
+  local reason=$1 path base depth
+  path=$(grep -oE "[^ ]*/HANDOFF-[0-9-]+\.md" <<<"$reason" | head -1)
+  base=$(grep -oE "Base: [^' ]+" <<<"$reason" | head -1 | cut -d' ' -f2)
+  depth=$(grep -oE "Chain depth: [0-9]+" <<<"$reason" | head -1 | cut -d' ' -f3)
+  [[ -n "$path" ]] && printf 'Base: %s\nChain depth: %s\n\nbody\n' "${base:-none}" "${depth:-1}" > "$path"
+}
+idle() { sleep "${FAKE_WAIT:-20}" & sp=$!; wait $sp; exit 0; }   # at the prompt; the hook's SIGTERM ends us (exit 0)
+
+if (( n > 1 )); then                         # relaunched session
+  for pc in ${FAKE_RELAUNCH_PCTS:-}; do      # e.g. "60 70": usage at each successive Stop
+    settx "$pc" "continue"; echo "relaunch-stop@$pc: $(stop)" >> "$FAKE_LOG"
+  done
+  exit 0                                     # user quits
+fi
+case "${FAKE_SCENARIO:-rotate}" in
+  quit)  exit 0 ;;
+  stale) touch -t 202001010000 "$CTX_RELAY_RUN_DIR/rotate.flag"; echo x > "$CTX_RELAY_RUN_DIR/handoff"; exit 0 ;;
+  manual)
+    settx 10 "Relay now!"; ctx=$(pre); echo "prompt: $ctx" >> "$FAKE_LOG"
+    obey "$(jq -r '.injectSteps[0].ephemeralMessage // empty' <<<"$ctx")"
+    echo "stop: $(stop)" >> "$FAKE_LOG"; idle ;;
+  emergency)
+    settx "${FAKE_PCT:-95}" "keep working"; ctx=$(pre); echo "pre: $ctx" >> "$FAKE_LOG"
+    obey "$(jq -r '.injectSteps[0].userMessage // empty' <<<"$ctx")"
+    echo "stop: $(stop)" >> "$FAKE_LOG"; idle ;;
+  nowfile) touch "$CTX_RELAY_RUN_DIR/rotate.now"; FAKE_PCT=5 ;;
+esac
+settx "${FAKE_PCT:-60}" "work"
+out=$(stop); echo "stop1: $out" >> "$FAKE_LOG"
+for try in 1 2 3 4; do
+  [[ "$out" == *'"decision":"continue"'* ]] || break
+  [[ -z "${FAKE_BAD:-}" ]] && obey "$(jq -r .reason <<<"$out")"
+  out=$(stop); echo "stop$((try+1)): $out" >> "$FAKE_LOG"
+done
+idle
