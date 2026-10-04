@@ -77,8 +77,12 @@ more than 5 files, and keeps references from rotting.
 
 Handoffs are written to the launch directory (`CTX_RELAY_HANDOFF_DIR`); gitignore `HANDOFF-*.md`
 if you do not want them committed. `claude-pro` integration: `docs/claude-pro-integration.md`.
-Known limit: on relaunch the original resume flags and a trailing initial prompt are dropped
-(the prompt detection is best-effort).
+On relaunch, resume flags (`-c`, `-r`, `--session-id`) and the initial prompt are deliberately
+dropped: the handoff replaces the old session, and resuming would reload the large context we are
+escaping. (Detecting a trailing prompt is best-effort.)
+
+Units: `CTX_RELAY_THRESHOLD` (default 50) is percent of the context window; `CTX_RELAY_MIN_GROWTH`
+(default 15) is percentage points of growth over the fresh session's baseline.
 
 ## License
 
