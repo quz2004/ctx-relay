@@ -3,7 +3,7 @@
 Automatic context rollover for Claude Code: write a handoff at the pause, restart with a fresh
 context, and continue where you left off.
 
-> Status: planning. No code yet. See the latest `HANDOFF-*.md`.
+> Status: working prototype (fake-claude tests pass; real-claude end-to-end pending). See the latest `HANDOFF-*.md`.
 
 ## Rationale
 
@@ -69,6 +69,16 @@ session must never write a handoff of depth 6. Instead it writes a new baseline:
 chain and restates everything still relevant in one self-contained file, with `Base: none` and
 `Chain depth: 1`. Older files can then be archived. This keeps a new session from having to read
 more than 5 files, and keeps references from rotting.
+
+## Usage
+
+    bin/ctx-relay [claude flags...]        # drop-in for `claude`
+    test/run-tests.sh                      # no real claude, no tmux; safe anywhere
+
+Handoffs are written to the launch directory (`CTX_RELAY_HANDOFF_DIR`); gitignore `HANDOFF-*.md`
+if you do not want them committed. `claude-pro` integration: `docs/claude-pro-integration.md`.
+Known limit: on relaunch the original resume flags and a trailing initial prompt are dropped
+(the prompt detection is best-effort).
 
 ## License
 

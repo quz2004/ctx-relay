@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Stand-in for `claude`. Drives the real hooks from the --settings file like Claude Code does.
+# FAKE_PCT: reported usage. FAKE_SCENARIO: rotate (default) | quit | die143 | stale
+set -u
+settings=""; args=("$@")
+for ((i=0;i<${#args[@]};i++)); do [[ "${args[i]}" == --settings ]] && settings="${args[i+1]}"; done
+n=$(( $(cat "$FAKE_LOG.count" 2>/dev/null || echo 0) + 1 )); echo $n > "$FAKE_LOG.count"
+echo "launch $n: $*" >> "$FAKE_LOG"
+hook() { jq -r ".hooks.$1[0].hooks[0].command" "$settings"; }
+sl=$(jq -r .statusLine.command "$settings")
+(( n > 1 )) && exit 0                      # relaunched session: user quits (Ctrl-D)
+case "${FAKE_SCENARIO:-rotate}" in
+  quit)   exit 0 ;;
+  die143) exit 143 ;;                        # killed, but no rotation flag
+  stale)  touch -t 202001010000 "$CTX_RELAY_RUN_DIR/rotate.flag"; echo x > "$CTX_RELAY_RUN_DIR/handoff"; exit 143 ;;
+esac
+echo "{\"context_window\":{\"used_percentage\":${FAKE_PCT:-60},\"context_window_size\":200000}}" | bash -c "$sl" >/dev/null
+stop() { jq -cn --argjson a "$1" '{hook_event_name:"Stop",stop_hook_active:$a,transcript_path:"/nonexistent",background_tasks:[]}' | bash -c "$(hook Stop)"; }
+out=$(stop false); echo "stop1: $out" >> "$FAKE_LOG"
+for try in 1 2 3 4; do
+  [[ "$out" == *'"decision":"block"'* ]] || break
+  if [[ -z "${FAKE_BAD:-}" ]]; then   # obey the reason: write the named file with the named header
+    reason=$(jq -r .reason <<<"$out")
+    path=$(grep -oE "[^ ]*/HANDOFF-[0-9-]+\.md" <<<"$reason" | head -1)
+    base=$(grep -oE "Base: [^' ]+" <<<"$reason" | head -1 | cut -d' ' -f2)
+    depth=$(grep -oE "Chain depth: [0-9]+" <<<"$reason" | head -1 | cut -d' ' -f3)
+    printf 'Base: %s\nChain depth: %s\n\nbody\n' "$base" "$depth" > "$path"
+  fi
+  out=$(stop true); echo "stop$((try+1)): $out" >> "$FAKE_LOG"
+done
+sleep "${FAKE_WAIT:-20}"                     # idle at the prompt; the hook's SIGTERM ends us (143)
+exit 0

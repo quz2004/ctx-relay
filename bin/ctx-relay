@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# ctx-relay: supervise `claude`; when a handoff-then-kill rotation was requested by the Stop hook,
+# relaunch a fresh session that reads the handoff. Anything else exits normally.
+set -uo pipefail
+SELF=$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")
+ROOT=$(cd "$(dirname "$SELF")/.." && pwd)
+CLAUDE=${CTX_RELAY_CLAUDE:-claude}
+BASE_DIR=${CTX_RELAY_HOME:-$HOME/.claude/ctx-relay}
+
+export CTX_RELAY_RUN_ID="$(date +%Y%m%d-%H%M%S)-$$"
+export CTX_RELAY_RUN_DIR="$BASE_DIR/runs/$CTX_RELAY_RUN_ID"
+export CTX_RELAY_WRAPPER_PID=$$
+export CTX_RELAY_HANDOFF_DIR=${CTX_RELAY_HANDOFF_DIR:-$PWD}
+export CTX_RELAY_THRESHOLD=${CTX_RELAY_THRESHOLD:-50}
+export CTX_RELAY_AUTOCLEAR=${CTX_RELAY_AUTOCLEAR:-1}
+mkdir -p "$CTX_RELAY_RUN_DIR"
+
+# The user's own statusline is chained, not replaced.
+export CTX_RELAY_ORIG_STATUSLINE=$(jq -r '.statusLine.command // empty' "$HOME/.claude/settings.json" 2>/dev/null)
+jq -n --arg stop "$ROOT/hooks/stop.sh" --arg pre "$ROOT/hooks/pretool.sh" --arg sl "$ROOT/hooks/statusline.sh" '
+  {statusLine:{type:"command",command:$sl,refreshInterval:2},
+   hooks:{Stop:[{hooks:[{type:"command",command:$stop}]}],
+          PreToolUse:[{hooks:[{type:"command",command:$pre}]}]}}' > "$CTX_RELAY_RUN_DIR/settings.json"
+
+# Relaunch args: drop resume/continue flags and a trailing positional prompt.
+relaunch_args() {
+  local out=() skip=0 a
+  for a in "$@"; do
+    if (( skip )); then skip=0; [[ "$a" == -* ]] || continue; fi
+    case "$a" in
+      -c|--continue) continue ;;
+      -r|--resume|--session-id|--from-pr) skip=1; continue ;;
+      --resume=*|--session-id=*) continue ;;
+    esac
+    out+=("$a")
+  done
+  # a final non-flag arg that is not the value of a preceding flag is the initial prompt
+  local n=${#out[@]}
+  if (( n )) && [[ "${out[n-1]}" != -* ]] && { (( n == 1 )) || [[ "${out[n-2]}" != -* ]] || [[ "${out[n-2]}" == *=* ]]; }; then
+    unset 'out[n-1]'
+  fi
+  printf '%s\0' "${out[@]}"
+}
+
+args=("$@")
+rotations=0
+while :; do
+  rm -f "$CTX_RELAY_RUN_DIR/rotate.flag"; echo idle > "$CTX_RELAY_RUN_DIR/state"
+  "$CLAUDE" --settings "$CTX_RELAY_RUN_DIR/settings.json" "${args[@]}"
+  rc=$?
+  flag="$CTX_RELAY_RUN_DIR/rotate.flag"
+  if [[ -f "$flag" && $rc -eq 143 ]] && (( $(date +%s) - $(stat -f %m "$flag" 2>/dev/null || stat -c %Y "$flag") < 60 )) \
+     && [[ -s "$CTX_RELAY_RUN_DIR/handoff" ]]; then
+    h=$(cat "$CTX_RELAY_RUN_DIR/handoff")
+    [[ -s "$CTX_RELAY_HANDOFF_DIR/$h" ]] || exit $rc
+    rotations=$((rotations+1))
+    echo "[ctx-relay] rotating (#$rotations) -> $h" >&2
+    mapfile -d '' kept < <(relaunch_args "$@")
+    args=("${kept[@]}" "Read $CTX_RELAY_HANDOFF_DIR/$h, then every handoff listed under its Base: chain (oldest context first). Continue from the Next Step. Do not re-explore.")
+    continue
+  fi
+  exit $rc
+done
