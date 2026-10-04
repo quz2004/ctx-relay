@@ -1,6 +1,6 @@
 # Wiring ctx-relay into `~/bin/claude-pro`
 
-`claude-pro` is not modified by the repo. Replace everything from
+A ready-made full copy is at `dist/claude-pro` (`cp dist/claude-pro ~/bin/claude-pro`). The repo does not modify it. Or replace everything from
 `if args_include_model "${FILTERED_ARGS[@]}"; then` to the end of the file with:
 
 ```bash
