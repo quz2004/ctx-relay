@@ -66,3 +66,12 @@ ctx_block_reason() {  # name base depth [extra]
   printf 'Context is nearly full, so this session will be restarted fresh. Before stopping, write the handoff to %s/%s (exact name, project directory). %s Put the two header lines first. Write only the file, then stop and wait; do not continue the task.' \
     "${CTX_RELAY_HANDOFF_DIR}" "$name" "$how"
 }
+
+# Put the run into "requested" and print the instruction text for the agent.
+ctx_request_handoff() {  # run_dir
+  local D="$1" name base depth extra
+  IFS='|' read -r name base depth extra <<<"$(ctx_plan_handoff "$CTX_RELAY_HANDOFF_DIR")"
+  printf '%s\n' "$name|$base|$depth|$extra" > "$D/request"
+  echo 0 > "$D/attempts"; echo requested > "$D/state"
+  ctx_block_reason "$name" "$base" "$depth" "$extra"
+}

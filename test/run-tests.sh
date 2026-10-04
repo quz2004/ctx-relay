@@ -45,6 +45,15 @@ run loop FAKE_PCT=60 FAKE_RELAUNCH_PCTS="60 65"
 grep -q 'relaunch-stop@60: none' "$LOG" && grep -q 'relaunch-stop@65: none' "$LOG" && ok "first Stop records baseline; +5 growth ignored" || bad "$(grep relaunch-stop "$LOG")"
 run grow FAKE_PCT=60 FAKE_RELAUNCH_PCTS="25 55"
 grep -q 'relaunch-stop@55: {"decision":"block"' "$LOG" && ok "real growth (+30) over baseline does request a new handoff" || bad "$(grep relaunch-stop "$LOG")"
+echo "manual rotation"
+run man FAKE_PCT=10 FAKE_SCENARIO=manual
+[[ $(launches) == 2 ]] && ls "$W"/HANDOFF-*.md >/dev/null 2>&1 && ok "'relay now' at 10% usage rotates" || bad "launches=$(launches)"
+run manoff FAKE_PCT=10 FAKE_SCENARIO=manual CTX_RELAY_AUTOCLEAR=0
+[[ $(launches) == 2 ]] && ok "works with AUTOCLEAR=0 (manual-only mode)" || bad "launches=$(launches)"
+run nf FAKE_SCENARIO=nowfile
+[[ $(launches) == 2 ]] && ok "'ctx-relay now' trigger file rotates at next Stop" || bad "launches=$(launches)"
+run noauto FAKE_PCT=60 CTX_RELAY_AUTOCLEAR=0 FAKE_WAIT=0
+[[ $(launches) == 1 ]] && ok "AUTOCLEAR=0: no automatic rotation" || bad "launches=$(launches)"
 echo "chain depth"
 mkdir -p "$T/chain"; W="$T/chain"
 printf 'Base: none\nChain depth: 1\n' > "$W/HANDOFF-2026-01-01-0000.md"

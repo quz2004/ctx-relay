@@ -84,6 +84,12 @@ escaping. (Detecting a trailing prompt is best-effort.)
 Units: `CTX_RELAY_THRESHOLD` (default 50) is percent of the context window; `CTX_RELAY_MIN_GROWTH`
 (default 15) is percentage points of growth over the fresh session's baseline.
 
+## Manual rotation
+
+- Type `relay now` (or `relay`) in the session: the agent writes the handoff in that turn, then the
+  session restarts. Works at any usage level, including with `CTX_RELAY_AUTOCLEAR=0` (manual-only).
+- From another terminal: `ctx-relay now` queues a rotation for the newest run; it fires at the next pause.
+
 ## License
 
 MIT

@@ -26,6 +26,10 @@ claude_pid() {  # ancestor whose parent is the wrapper
 case "$state" in
   idle)
     [[ "$active" == true || "$bg" -gt 0 ]] && exit 0
+    if [[ -e "$D/rotate.now" ]]; then   # manual trigger from another terminal: `ctx-relay now`
+      rm -f "$D/rotate.now"
+      block "$(ctx_request_handoff "$D")"
+    fi
     [[ "${CTX_RELAY_AUTOCLEAR:-1}" == 1 ]] || exit 0
     pct=$(ctx_usage_pct "$D" "$transcript")
     # Relaunched session: the first Stop is the reply to the handoff-reading prompt. It only records

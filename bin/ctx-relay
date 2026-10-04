@@ -2,6 +2,11 @@
 # ctx-relay: supervise `claude`; when a handoff-then-kill rotation was requested by the Stop hook,
 # relaunch a fresh session that reads the handoff. Anything else exits normally.
 set -uo pipefail
+if [[ "${1:-}" == now ]]; then   # ctx-relay now: rotate the current run at its next pause
+  d=${CTX_RELAY_RUN_DIR:-$(ls -dt "${CTX_RELAY_HOME:-$HOME/.claude/ctx-relay}"/runs/*/ 2>/dev/null | head -1)}
+  [[ -d "$d" ]] || { echo "ctx-relay: no run found" >&2; exit 1; }
+  touch "$d/rotate.now"; echo "ctx-relay: rotation queued for $d (fires at the next pause)"; exit 0
+fi
 SELF=$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")
 ROOT=$(cd "$(dirname "$SELF")/.." && pwd)
 CLAUDE=${CTX_RELAY_CLAUDE:-claude}
@@ -17,10 +22,11 @@ mkdir -p "$CTX_RELAY_RUN_DIR"
 
 # The user's own statusline is chained, not replaced.
 export CTX_RELAY_ORIG_STATUSLINE=$(jq -r '.statusLine.command // empty' "$HOME/.claude/settings.json" 2>/dev/null)
-jq -n --arg stop "$ROOT/hooks/stop.sh" --arg pre "$ROOT/hooks/pretool.sh" --arg sl "$ROOT/hooks/statusline.sh" '
+jq -n --arg stop "$ROOT/hooks/stop.sh" --arg pre "$ROOT/hooks/pretool.sh" --arg sl "$ROOT/hooks/statusline.sh" --arg up "$ROOT/hooks/prompt.sh" '
   {statusLine:{type:"command",command:$sl,refreshInterval:2},
    hooks:{Stop:[{hooks:[{type:"command",command:$stop}]}],
-          PreToolUse:[{hooks:[{type:"command",command:$pre}]}]}}' > "$CTX_RELAY_RUN_DIR/settings.json"
+          PreToolUse:[{hooks:[{type:"command",command:$pre}]}],
+          UserPromptSubmit:[{hooks:[{type:"command",command:$up}]}]}}' > "$CTX_RELAY_RUN_DIR/settings.json"
 
 # Relaunch args: drop resume/continue flags and a trailing positional prompt.
 relaunch_args() {

@@ -22,6 +22,16 @@ case "${FAKE_SCENARIO:-rotate}" in
   quit)   exit 0 ;;
   die143) exit 143 ;;                        # killed, but no rotation flag
   stale)  touch -t 202001010000 "$CTX_RELAY_RUN_DIR/rotate.flag"; echo x > "$CTX_RELAY_RUN_DIR/handoff"; exit 143 ;;
+  manual) # user types "relay now" at 10% usage: agent writes handoff in that turn, then Stop rotates
+    ctx=$(jq -cn '{hook_event_name:"UserPromptSubmit",prompt:"Relay now!"}' | bash -c "$(hook UserPromptSubmit)")
+    echo "prompt: $ctx" >> "$FAKE_LOG"
+    reason=$(jq -r '.hookSpecificOutput.additionalContext // empty' <<<"$ctx")
+    path=$(grep -oE "[^ ]*/HANDOFF-[0-9-]+\.md" <<<"$reason" | head -1)
+    [[ -n "$path" ]] && printf 'Base: none\nChain depth: 1\n' > "$path"
+    jq -cn '{hook_event_name:"Stop",stop_hook_active:false,transcript_path:"/nonexistent",background_tasks:[]}' | bash -c "$(hook Stop)" >> "$FAKE_LOG"
+    sleep "${FAKE_WAIT:-20}"; exit 0 ;;
+  nowfile) # `ctx-relay now` from another terminal, honored at the next Stop
+    touch "$CTX_RELAY_RUN_DIR/rotate.now"; FAKE_PCT=5 ;;
 esac
 echo "{\"context_window\":{\"used_percentage\":${FAKE_PCT:-60},\"context_window_size\":200000}}" | bash -c "$sl" >/dev/null
 stop() { jq -cn --argjson a "$1" '{hook_event_name:"Stop",stop_hook_active:$a,transcript_path:"/nonexistent",background_tasks:[]}' | bash -c "$(hook Stop)"; }
