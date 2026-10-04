@@ -54,6 +54,15 @@ run nf FAKE_SCENARIO=nowfile
 [[ $(launches) == 2 ]] && ok "'ctx-relay now' trigger file rotates at next Stop" || bad "launches=$(launches)"
 run noauto FAKE_PCT=60 CTX_RELAY_AUTOCLEAR=0 FAKE_WAIT=0
 [[ $(launches) == 1 ]] && ok "AUTOCLEAR=0: no automatic rotation" || bad "launches=$(launches)"
+echo "notify (manual-only)"
+grep -q 'systemMessage' "$W/fake.log" && ok "AUTOCLEAR=0 above threshold: user is told to type 'relay now'" || bad "no notice: $(cat "$W/fake.log")"
+[[ $(grep -c systemMessage "$W/fake.log") == 1 ]] && ok "notice is shown once" || bad "notice count"
+echo "background tasks"
+BG="$T/bg"; mkdir -p "$BG"; echo idle > "$BG/state"; echo '{"used_percentage":60,"context_window_size":200000}' > "$BG/ctx.json"
+bgstop() { jq -cn --argjson b "$1" '{stop_hook_active:false,transcript_path:"/nonexistent",background_tasks:$b}' \
+  | env CTX_RELAY_RUN_DIR="$BG" CTX_RELAY_HANDOFF_DIR="$BG" CTX_RELAY_THRESHOLD=50 CTX_RELAY_ROTATIONS=0 "$ROOT/hooks/stop.sh"; }
+[[ -z "$(bgstop '[{"id":"b1"}]')" && "$(cat "$BG/state")" == idle ]] && ok "background task running: rotation deferred" || bad "bg: rotated"
+bgstop '[]' | grep -q '"decision":"block"' && ok "background done: next Stop requests the handoff" || bad "bg: not requested"
 echo "config (/relay)"
 mkdir -p "$T/cfg/home"; echo THRESHOLD=70 > "$T/cfg/home/config"
 run cfg FAKE_PCT=60 FAKE_WAIT=0 CTX_RELAY_HOME="$T/cfg/home"

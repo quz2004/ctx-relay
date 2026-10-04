@@ -101,7 +101,7 @@ fi
 args=("$@")
 while :; do
   export CTX_RELAY_ROTATIONS=$rotations
-  rm -f "$CTX_RELAY_RUN_DIR"/{rotate.flag,ctx.json,baseline}; echo idle > "$CTX_RELAY_RUN_DIR/state"
+  rm -f "$CTX_RELAY_RUN_DIR"/{rotate.flag,ctx.json,baseline,notified}; echo idle > "$CTX_RELAY_RUN_DIR/state"
   "$CLAUDE" --settings "$CTX_RELAY_RUN_DIR/settings.json" "${args[@]}"
   rc=$?
   flag="$CTX_RELAY_RUN_DIR/rotate.flag"

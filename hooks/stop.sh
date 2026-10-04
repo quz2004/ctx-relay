@@ -30,8 +30,14 @@ case "$state" in
       rm -f "$D/rotate.now"
       block "$(ctx_request_handoff "$D")"
     fi
-    [[ "$(ctx_cfg AUTOCLEAR 1)" == 1 ]] || exit 0
     pct=$(ctx_usage_pct "$D" "$transcript")
+    if [[ "$(ctx_cfg AUTOCLEAR 1)" != 1 ]]; then   # manual-only: tell the user once, never rotate
+      if (( pct >= thr )) && [[ ! -e "$D/notified" ]]; then
+        touch "$D/notified"
+        jq -cn --arg m "ctx-relay: context at ${pct}% (threshold ${thr}%). Type 'relay now' to rotate to a fresh session." '{systemMessage:$m}'
+      fi
+      exit 0
+    fi
     # Relaunched session: the first Stop is the reply to the handoff-reading prompt. It only records
     # the fresh-context baseline; later rotations need real growth, or a high baseline loops forever.
     if (( ${CTX_RELAY_ROTATIONS:-0} > 0 )); then

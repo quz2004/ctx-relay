@@ -3,7 +3,7 @@
 Automatic context rollover for Claude Code: write a handoff at the pause, restart with a fresh
 context, and continue where you left off.
 
-> Status: working prototype (fake-claude tests pass; real-claude end-to-end pending). See the latest `HANDOFF-*.md`.
+> Status: working. Verified end to end with real Claude Code 2.1.289 (rotation, kill, relaunch, handoff read); `test/run-tests.sh` runs the fake-claude suite.
 
 ## Rationale
 
@@ -104,6 +104,18 @@ defaults live in `~/.claude/ctx-relay/config`. The command only works in session
 - Type `relay now` (or `relay`) in the session: the agent writes the handoff in that turn, then the
   session restarts. Works at any usage level, including with `CTX_RELAY_AUTOCLEAR=0` (manual-only).
 - From another terminal: `ctx-relay now` queues a rotation for the newest run; it fires at the next pause.
+- Notify-only: with `CTX_RELAY_AUTOCLEAR=0` (or `/relay autoclear=off`), the first pause above the
+  threshold shows one message, "context at N%... type 'relay now'", and never rotates by itself.
+
+## Requirements and limitations
+
+- bash, `jq`, and Claude Code on macOS or Linux. **Windows is not supported** (bash, signals, `ps`).
+- Rotation is deferred while the agent has background tasks (`background_tasks` in the Stop payload);
+  it fires at a later Stop with none running. Tests cover this.
+- The kill is sent after the handoff file has been validated, so a kill that lands during the final
+  render can only cut the trailing chat text, never the handoff. This is by design, not load-tested.
+- `SessionEnd` hooks do fire under the SIGTERM (measured), so other plugins still get their end-of-session event.
+- `settings.json` is generated once per wrapper start; restart the wrapper after upgrading ctx-relay.
 
 ## License
 
