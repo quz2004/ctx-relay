@@ -43,7 +43,7 @@ if [[ "${1:-}" == config ]]; then   # ctx-relay config [threshold=N] [growth=N] 
   . "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/lib/ctx-lib.sh"
   CTX_RELAY_RUN_DIR=$d
   printf 'ctx-relay settings (this run%s):\n  threshold  %s%%  (first pause above this asks for a handoff)\n  growth     %s pts  (min growth over a fresh session baseline before rotating again)\n  emergency  %s%%  (interrupt mid-run)\n  autoclear  %s\n' \
-    "$( ((save)) && echo ', saved as default')" "$(ctx_cfg THRESHOLD 50)" "$(ctx_cfg MIN_GROWTH 15)" "$(ctx_cfg EMERGENCY 90)" \
+    "$( ((save)) && echo ', saved as default')" "$(ctx_cfg THRESHOLD 20)" "$(ctx_cfg MIN_GROWTH 15)" "$(ctx_cfg EMERGENCY 90)" \
     "$([[ $(ctx_cfg AUTOCLEAR 1) == 1 ]] && echo on || echo off)"
   exit 0
 fi
@@ -75,7 +75,7 @@ export CTX_RELAY_RUN_ID="$(date +%Y%m%d-%H%M%S)-$$"
 export CTX_RELAY_RUN_DIR="$BASE_DIR/runs/$CTX_RELAY_RUN_ID"
 export CTX_RELAY_WRAPPER_PID=$$
 export CTX_RELAY_HANDOFF_DIR=${CTX_RELAY_HANDOFF_DIR:-$PWD}
-export CTX_RELAY_THRESHOLD=${CTX_RELAY_THRESHOLD:-50}
+export CTX_RELAY_THRESHOLD=${CTX_RELAY_THRESHOLD:-20}
 export CTX_RELAY_AUTOCLEAR=${CTX_RELAY_AUTOCLEAR:-1}
 mkdir -p "$CTX_RELAY_RUN_DIR"
 [[ -f "$BASE_DIR/config" ]] && cp "$BASE_DIR/config" "$CTX_RELAY_RUN_DIR/config"   # saved defaults

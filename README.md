@@ -26,7 +26,7 @@ re-read bill still dominates the session.
 Rolling over to a fresh context at a natural pause turns one long quadratic curve into several
 short ones. Splitting *n* turns into *k* sessions of *n/k* turns costs about `k * (n/k)^2 / 2 =
 n^2 / 2k`, roughly a *k*-fold saving on re-read tokens, minus the small cost of one handoff write
-and one handoff read per rollover. A rollover at 50% of the window is far cheaper than carrying
+and one handoff read per rollover. A rollover at 20% of the window is far cheaper than carrying
 the session to 90% and then compacting.
 
 So ctx-relay aims for:
@@ -43,7 +43,7 @@ So ctx-relay aims for:
 
 A small launcher supervises `claude` in a loop instead of `exec`-ing it. Hooks and a statusline
 wrapper (injected with `--settings`, so your global settings stay untouched) track context usage.
-At the first Stop above the threshold (default 50%), the Stop hook asks the agent to write a
+At the first Stop above the threshold (default 20%), the Stop hook asks the agent to write a
 handoff; at the next Stop, it drops a flag and ends the process. The launcher sees the flag and
 starts a fresh `claude` that reads the handoff and continues. Details are in the handoff files.
 
@@ -82,7 +82,7 @@ On relaunch, resume flags (`-c`, `-r`, `--session-id`) and the initial prompt ar
 dropped: the handoff replaces the old session, and resuming would reload the large context we are
 escaping. (Detecting a trailing prompt is best-effort.)
 
-Units: `CTX_RELAY_THRESHOLD` (default 50) is percent of the context window; `CTX_RELAY_MIN_GROWTH`
+Units: `CTX_RELAY_THRESHOLD` (default 20) is percent of the context window; `CTX_RELAY_MIN_GROWTH`
 (default 15) is percentage points of growth over the fresh session's baseline.
 
 ## Settings: `/relay` slash command

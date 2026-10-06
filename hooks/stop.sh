@@ -10,7 +10,7 @@ active=$(jq -r '.stop_hook_active // false' <<<"$in")
 transcript=$(jq -r '.transcript_path // empty' <<<"$in")
 bg=$(jq -r '((.background_tasks // []) | length)' <<<"$in")
 state=$(cat "$D/state" 2>/dev/null || echo idle)
-thr=$(ctx_cfg THRESHOLD 50)
+thr=$(ctx_cfg THRESHOLD 20)
 
 block() { jq -cn --arg r "$1" '{decision:"block",reason:$r}'; exit 0; }
 

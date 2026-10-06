@@ -38,5 +38,5 @@ fi
 `claude-pro next` continues from the newest handoff in the current directory.
 
 Without ctx-relay present it behaves exactly as before (`exec claude ...`). Settings:
-`CTX_RELAY_THRESHOLD` (default 50), `CTX_RELAY_EMERGENCY` (90), `CTX_RELAY_AUTOCLEAR=0` (disable),
+`CTX_RELAY_THRESHOLD` (default 20), `CTX_RELAY_EMERGENCY` (90), `CTX_RELAY_AUTOCLEAR=0` (disable),
 `CTX_RELAY_HANDOFF_DIR` (default: launch directory).

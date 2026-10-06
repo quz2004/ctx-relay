@@ -18,7 +18,7 @@ started through `ctx-relay-agy` (they check `CTX_RELAY_RUN_DIR`).
 
 - **No PreToolUse hook.** agy treats an empty `{}` answer from PreToolUse as a deny, so the emergency (>= 90%) path runs from PreInvocation instead.
 - **Usage** is computed from the transcript (`input_tokens + cache_read_tokens` of the latest model step) because no payload carries a percentage.
-  The default window is 1,000,000 (Gemini 3.8 Flash), so the 50% threshold is 500k tokens. Set `CTX_RELAY_WINDOW` (e.g. 200000) to rotate earlier.
+  The default window is 1,000,000 (Gemini 3.8 Flash), so the default 20% threshold is 200k tokens. Set `CTX_RELAY_WINDOW` (e.g. 200000) to rotate earlier.
 - **agy exits 0 on SIGTERM**, so the wrapper trusts the fresh `rotate.flag` plus a valid handoff instead of exit code 143.
 - Relaunch uses `agy -i "<prompt>"`; `-c`, `--continue`, `--conversation` and an earlier `-i` are dropped.
 - **No `/relay` slash command.** Use `ctx-relay-agy config ...` or `ctx-relay-agy now` from another terminal, or type `relay now` in the session.
