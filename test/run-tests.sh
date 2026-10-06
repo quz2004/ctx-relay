@@ -23,6 +23,10 @@ h=$(ls "$W"/HANDOFF-*.md 2>/dev/null | head -1)
 grep -q "launch 2: .*Read $W/HANDOFF-" "$LOG" && ok "fresh session told to read handoff" || bad "prompt: $(grep 'launch 2' "$LOG")"
 grep -q -- '--model sonnet' <(grep 'launch 2' "$LOG") && ok "original flags kept" || bad "flags lost"
 [[ $RC == 0 ]] && ok "wrapper exit 0 after user quits" || bad "rc=$RC"
+echo "rotation with no user flags (empty-arg bug)"
+W="$T/noflag"; mkdir -p "$W/home"; LOG="$W/fake.log"; : > "$LOG"
+( cd "$W" && env CTX_RELAY_HOME="$W/home" CTX_RELAY_HANDOFF_DIR="$W" FAKE_LOG="$LOG" FAKE_PCT=60 "$ROOT/bin/ctx-relay" >/dev/null 2>&1 )
+grep -qE "launch 2: --settings [^ ]+ Read $W/HANDOFF-" "$LOG" && ok "no flags: handoff prompt is the first positional (no empty arg)" || bad "launch 2: $(grep 'launch 2' "$LOG")"
 echo "below threshold"
 run low FAKE_PCT=10 FAKE_SCENARIO=rotate FAKE_WAIT=0
 [[ $(launches) == 1 && ! -e "$W"/HANDOFF-* ]] 2>/dev/null && ok "no block, no relaunch" || bad "launches=$(launches)"
