@@ -150,6 +150,7 @@ args=("$@")
 while :; do
   export CTX_RELAY_ROTATIONS=$rotations
   rm -f "$CTX_RELAY_RUN_DIR"/{rotate.flag,ctx.json,baseline,notified}; echo idle > "$CTX_RELAY_RUN_DIR/state"
+  touch "$CTX_RELAY_RUN_DIR/session.start"
   launch "$first_prompt"
   rc=$?
   first_prompt=""

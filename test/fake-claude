@@ -30,6 +30,10 @@ case "${FAKE_SCENARIO:-rotate}" in
     [[ -n "$path" ]] && printf 'Base: none\nChain depth: 1\n' > "$path"
     jq -cn '{hook_event_name:"Stop",stop_hook_active:false,transcript_path:"/nonexistent",background_tasks:[]}' | bash -c "$(hook Stop)" >> "$FAKE_LOG"
     sleep "${FAKE_WAIT:-20}"; exit 0 ;;
+  selfwrite) # agent wrote a valid handoff outside the state machine (e.g. hook missed "relay now"); Stop must adopt it
+    printf 'Base: none\nChain depth: 1\n\nself-written\n' > "$CTX_RELAY_HANDOFF_DIR/HANDOFF-2099-01-01-0000.md" ;;
+  stalehand) printf 'Base: none\nChain depth: 1\n' > "$CTX_RELAY_HANDOFF_DIR/HANDOFF-2099-01-01-0000.md"
+    touch -t 202001010000 "$CTX_RELAY_HANDOFF_DIR/HANDOFF-2099-01-01-0000.md" ;;
   nowfile) # `ctx-relay now` from another terminal, honored at the next Stop
     touch "$CTX_RELAY_RUN_DIR/rotate.now"; FAKE_PCT=5 ;;
 esac

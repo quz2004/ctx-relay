@@ -23,11 +23,32 @@ claude_pid() {  # ancestor whose parent is the wrapper
   done
 }
 
+rotate_now() {  # handoff file $1 is final: flag it, then SIGTERM claude shortly (the Stop that follows exits cleanly)
+  local pid; pid=$(claude_pid)
+  if [[ -z "$pid" ]]; then echo idle > "$D/state"; return 1; fi
+  echo "$1" > "$D/handoff"; echo rotating > "$D/state"
+  touch "$D/rotate.flag"
+  ( sleep "${CTX_RELAY_KILL_DELAY:-1}"; kill -TERM "$pid" ) >/dev/null 2>&1 &
+  disown
+}
+
+# The agent already wrote a valid handoff since this session started (e.g. a missed "relay now"): adopt it
+# instead of asking for a second one. Files older than session.start never count.
+adopt_handoff() {
+  local h f
+  h=$(ctx_latest_handoff "$CTX_RELAY_HANDOFF_DIR"); [[ -n "$h" ]] || return 1
+  f="$CTX_RELAY_HANDOFF_DIR/$h"
+  [[ -e "$D/session.start" && ! "$D/session.start" -nt "$f" ]] || return 1
+  ctx_handoff_ok "$f" "$(ctx_depth_of "$f")" || return 1
+  rotate_now "$h"
+}
+
 case "$state" in
   idle)
     [[ "$active" == true || "$bg" -gt 0 ]] && exit 0
     if [[ -e "$D/rotate.now" ]]; then   # manual trigger from another terminal: `ctx-relay now`
       rm -f "$D/rotate.now"
+      adopt_handoff && exit 0
       block "$(ctx_request_handoff "$D")"
     fi
     pct=$(ctx_usage_pct "$D" "$transcript")
@@ -45,6 +66,7 @@ case "$state" in
       (( pct - $(cat "$D/baseline") >= $(ctx_cfg MIN_GROWTH 15) )) || exit 0
     fi
     (( pct >= thr )) || exit 0
+    adopt_handoff && exit 0
     plan=$(ctx_plan_handoff "$CTX_RELAY_HANDOFF_DIR")
     IFS='|' read -r name base depth extra <<<"$plan"
     printf '%s\n' "$name|$base|$depth|$extra" > "$D/request"
@@ -54,13 +76,7 @@ case "$state" in
   requested)
     IFS='|' read -r name base depth extra < "$D/request"
     if ctx_handoff_ok "$CTX_RELAY_HANDOFF_DIR/$name" "$depth"; then
-      pid=$(claude_pid)
-      if [[ -z "$pid" ]]; then echo idle > "$D/state"; exit 0; fi
-      echo "$name" > "$D/handoff"; echo rotating > "$D/state"
-      touch "$D/rotate.flag"
-      ( sleep "${CTX_RELAY_KILL_DELAY:-1}"; kill -TERM "$pid" ) >/dev/null 2>&1 &
-      disown
-      exit 0
+      rotate_now "$name"; exit 0
     fi
     n=$(( $(cat "$D/attempts" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$D/attempts"
     if (( n > 2 )); then echo idle > "$D/state"; exit 0; fi   # give up; never loop

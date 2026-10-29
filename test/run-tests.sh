@@ -49,6 +49,12 @@ run loop FAKE_PCT=60 FAKE_RELAUNCH_PCTS="60 65"
 grep -q 'relaunch-stop@60: none' "$LOG" && grep -q 'relaunch-stop@65: none' "$LOG" && ok "first Stop records baseline; +5 growth ignored" || bad "$(grep relaunch-stop "$LOG")"
 run grow FAKE_PCT=60 FAKE_RELAUNCH_PCTS="25 55"
 grep -q 'relaunch-stop@55: {"decision":"block"' "$LOG" && ok "real growth (+30) over baseline does request a new handoff" || bad "$(grep relaunch-stop "$LOG")"
+echo "no duplicate handoff (agent already wrote one this turn)"
+run sw FAKE_PCT=60 FAKE_SCENARIO=selfwrite
+[[ $(launches) == 2 && $(ls "$W"/HANDOFF-*.md | wc -l | tr -d " ") == 1 ]] && ok "fresh self-written handoff is adopted: rotates, no second handoff" || bad "launches=$(launches) files=$(ls "$W"/HANDOFF-*.md)"
+grep -q 'decision":"block' "$LOG" && bad "hook asked for another handoff" || ok "no second handoff requested"
+run sh FAKE_PCT=60 FAKE_SCENARIO=stalehand
+[[ $(launches) == 2 && $(ls "$W"/HANDOFF-*.md | wc -l | tr -d " ") == 2 ]] && ok "old handoff (before this session) is not adopted" || bad "launches=$(launches) files=$(ls "$W"/HANDOFF-*.md)"
 echo "manual rotation"
 run man FAKE_PCT=10 FAKE_SCENARIO=manual
 [[ $(launches) == 2 ]] && ls "$W"/HANDOFF-*.md >/dev/null 2>&1 && ok "'relay now' at 10% usage rotates" || bad "launches=$(launches)"
