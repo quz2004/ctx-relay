@@ -70,6 +70,33 @@ chain and restates everything still relevant in one self-contained file, with `B
 `Chain depth: 1`. Older files can then be archived. This keeps a new session from having to read
 more than 5 files, and keeps references from rotting.
 
+## Install
+
+ctx-relay is **not** a Claude Code plugin (there is no `/plugin install`). It is a launcher you run in
+place of `claude`. Its hooks are injected per run with `--settings`, so your global settings stay
+untouched and uninstalling is just deleting the clone.
+
+Requirements: bash, `jq`, Claude Code, macOS or Linux (see Requirements below).
+
+    git clone https://github.com/quz2004/ctx-relay.git ~/ctx-relay      # any location works
+    cd ~/ctx-relay
+    test/run-tests.sh                                                   # fake claude, safe; should end with all tests passing
+    ln -s ~/ctx-relay/bin/ctx-relay ~/bin/ctx-relay                     # or any dir on your PATH; an alias works too
+    ctx-relay install                                                   # adds the /relay slash command to ~/.claude/commands
+    ctx-relay                                                           # use instead of `claude`; flags pass through
+
+To let Claude do it, open Claude Code in the clone and say: "install ctx-relay following the Install
+section of README.md". After pulling a new version, run `ctx-relay install` again to refresh `/relay`
+and restart any running `ctx-relay` session.
+
+Optional wiring:
+
+- `claude-pro` or another wrapper script: `docs/claude-pro-integration.md`. Point it at your clone with
+  `CTX_RELAY_BIN=/path/to/ctx-relay/bin/ctx-relay`. `dist/claude-pro` is the author's personal launcher, a
+  worked example and not a general install artifact.
+- Antigravity CLI (`agy`): `bin/ctx-relay-agy`, see `docs/agy-integration.md`.
+- Bypass at any time with `CTX_RELAY_DISABLE=1` in a wrapper, or just run `claude` directly.
+
 ## Usage
 
     bin/ctx-relay [claude flags...]        # drop-in for `claude`
