@@ -4,6 +4,8 @@ set -u
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 T=$(mktemp -d); pass=0; fail=0
 export CTX_RELAY_CLAUDE="$ROOT/test/fake-claude" CTX_RELAY_KILL_DELAY=0.2 CTX_RELAY_THRESHOLD=50
+export CTX_RELAY_BACKEND=claude
+unset CTX_RELAY_RUN_DIR 2>/dev/null || true
 export PATH="$PATH"
 ok()  { echo "  ok   $1"; pass=$((pass+1)); }
 bad() { echo "  FAIL $1"; fail=$((fail+1)); }

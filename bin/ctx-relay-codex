@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# ctx-relay-codex: start ctx-relay with CTX_RELAY_BACKEND=codex
+SELF=$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")
+ROOT=$(cd "$(dirname "$SELF")/.." && pwd)
+export CTX_RELAY_BACKEND=codex
+exec "$ROOT/bin/ctx-relay" "$@"

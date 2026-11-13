@@ -2,3 +2,6 @@ HANDOFF-*.md
 dist/claude-pro
 .claude/
 dist/agy-plus
+dist/codex-plus
+.agents/
+.codex/

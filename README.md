@@ -95,6 +95,7 @@ Optional wiring:
   `CTX_RELAY_BIN=/path/to/ctx-relay/bin/ctx-relay`. `dist/claude-pro` is the author's personal launcher, a
   worked example and not a general install artifact.
 - Antigravity CLI (`agy`): `bin/ctx-relay-agy`, see `docs/agy-integration.md`.
+- OpenAI Codex CLI (`codex`): `bin/ctx-relay-codex`, see `docs/codex-integration.md`.
 - Bypass at any time with `CTX_RELAY_DISABLE=1` in a wrapper, or just run `claude` directly.
 
 ## Usage
@@ -141,6 +142,14 @@ defaults live in `~/.claude/ctx-relay/config`. The command only works in session
     test/run-tests-agy.sh                  # fake agy; never touches ~/.agents
 
 Details, measured facts and caveats: `docs/agy-integration.md`. `agy-plus` wiring: `dist/agy-plus`.
+
+## OpenAI Codex CLI (`codex`)
+
+    bin/ctx-relay-codex [codex flags...]   # drop-in for `codex`; same rotation, handoff files and `next`
+    bin/ctx-relay-codex now                # queue a rotation (also: type `relay now` in the session)
+    test/run-tests-codex.sh                # fake codex; standalone test suite
+
+Details and caveats: `docs/codex-integration.md`. `codex-plus` wiring: `dist/codex-plus`.
 
 ## Requirements and limitations
 
